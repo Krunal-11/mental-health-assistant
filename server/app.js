@@ -5,13 +5,7 @@ app.use(express.json());
 
 // Connect to MongoDB
 mongoose
-<<<<<<< HEAD
   .connect("mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon")
-=======
-  .connect(
-    "mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon"
-  )
->>>>>>> 74b2efdaf302f9fd7732c5443f295bcae18e61b0
   .then(() => console.log("Connected to MongoDB"))
   .catch((error) => console.error("MongoDB connection error:", error));
 
