@@ -5,13 +5,9 @@ app.use(express.json());
 
 // Connect to MongoDB
 mongoose
-<<<<<<< HEAD
-  .connect("mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon")
-=======
   .connect(
     "mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon"
   )
->>>>>>> 74b2efdaf302f9fd7732c5443f295bcae18e61b0
   .then(() => console.log("Connected to MongoDB"))
   .catch((error) => console.error("MongoDB connection error:", error));
 
@@ -55,6 +51,7 @@ const SessionSchema = new mongoose.Schema({
 const UserSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true },
   sessions: [SessionSchema],
+  context: { type: String, default: "" },
 });
 
 // Models
@@ -104,10 +101,42 @@ app.post("/api/sessions/start", async (req, res) => {
     - message (String): Status message
     - session (Object): Updated session data with added chat
 */
+// app.post("/api/sessions/:sessionId/chats", async (req, res) => {
+//   try {
+//     const { sessionId } = req.params;
+//     const { userId, question, answer, polarity, data } = req.body;
+//     const chatMessage = {
+//       sessionId,
+//       userId,
+//       question,
+//       answer,
+//       polarity,
+//       data,
+//       timestamp: new Date(),
+//     };
+//     const user = await User.findOneAndUpdate(
+//       { "sessions._id": sessionId },
+//       { $push: { "sessions.$.chatHistory": chatMessage } },
+//       { new: true }
+//     );
+//     if (!user) return res.status(404).json({ message: "Session not found" });
+//     {
+//       console.log({ message: "Chat added", session: user.sessions.id(sessionId) })
+//       res
+//       .status(200)
+//       .json({ message: "Chat added", session: user.sessions.id(sessionId) });
+//     }
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
+
 app.post("/api/sessions/:sessionId/chats", async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { userId, question, answer, polarity, data } = req.body;
+
+    // Create the chat message object
     const chatMessage = {
       sessionId,
       userId,
@@ -117,18 +146,29 @@ app.post("/api/sessions/:sessionId/chats", async (req, res) => {
       data,
       timestamp: new Date(),
     };
+
+    // Format the new entry for context
+    const formattedContext = `\nUser: ${question}\nAI: ${answer}\n`;
+
+    // Find the user and update the chat history and context
     const user = await User.findOneAndUpdate(
       { "sessions._id": sessionId },
-      { $push: { "sessions.$.chatHistory": chatMessage } },
+      {
+        $push: { "sessions.$.chatHistory": chatMessage },
+        $set: { context: { $concat: ["$context", formattedContext] } },
+      },
       { new: true }
     );
+
     if (!user) return res.status(404).json({ message: "Session not found" });
-    {
-      console.log({ message: "Chat added", session: user.sessions.id(sessionId) })
-      res
+
+    console.log({
+      message: "Chat added",
+      session: user.sessions.id(sessionId),
+    });
+    res
       .status(200)
       .json({ message: "Chat added", session: user.sessions.id(sessionId) });
-    }
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -152,7 +192,7 @@ app.post("/api/sessions/:sessionId/chats", async (req, res) => {
 */
 app.put("/api/sessions/:sessionId/end", async (req, res) => {
   try {
-    console.log('/api/sessions/:sessionId/end api called at line 149')
+    console.log("/api/sessions/:sessionId/end api called at line 149");
     const { sessionId } = req.params;
     const { polarity, keywords, classified, severity, improvement } = req.body;
     const sessionUpdate = {
