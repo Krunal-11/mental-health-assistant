@@ -5,13 +5,7 @@ app.use(express.json());
 
 // Connect to MongoDB
 mongoose
-<<<<<<< HEAD
   .connect("mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon")
-=======
-  .connect(
-    "mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon"
-  )
->>>>>>> 74b2efdaf302f9fd7732c5443f295bcae18e61b0
   .then(() => console.log("Connected to MongoDB"))
   .catch((error) => console.error("MongoDB connection error:", error));
 
@@ -223,8 +217,9 @@ app.get("/api/sessions/:sessionId", async (req, res) => {
 ///these are the aips for the ui
 
 // 1. User Session Overview (Recent Sessions)
-app.get("/api/sessions/recent", async (req, res) => {
+app.get("/get/api/sessions/recent", async (req, res) => {
   try {
+    console.log('api entered line 222')
     const recentSessions = await Session.find()
       .sort({ sessionStart: -1 })
       .limit(10)
@@ -236,7 +231,7 @@ app.get("/api/sessions/recent", async (req, res) => {
 });
 
 // 2. Average Session Duration
-app.get("/api/sessions/average-duration", async (req, res) => {
+app.get("/get/api/sessions/average-duration", async (req, res) => {
   try {
     const avgSessionDuration = await Session.aggregate([
       { $match: { sessionEnd: { $exists: true } } },
@@ -259,7 +254,7 @@ app.get("/api/sessions/average-duration", async (req, res) => {
 });
 
 // 3. Keyword Analysis
-app.get("/api/sessions/keywords", async (req, res) => {
+app.get("/get/api/sessions/keywords", async (req, res) => {
   try {
     const keywordAnalysis = await Session.aggregate([
       { $unwind: "$keywords" },
@@ -278,7 +273,7 @@ app.get("/api/sessions/keywords", async (req, res) => {
 });
 
 // 4. Chat History Insights
-app.get("/api/sessions/:sessionId/chat-history", async (req, res) => {
+app.get("/get/api/sessions/:sessionId/chat-history", async (req, res) => {
   const { sessionId } = req.params;
   try {
     const chatHistory = await Chat.find({ sessionId }).populate(
@@ -292,7 +287,7 @@ app.get("/api/sessions/:sessionId/chat-history", async (req, res) => {
 });
 
 // 5. Classification Breakdown
-app.get("/api/sessions/classification", async (req, res) => {
+app.get("/get/api/sessions/classification", async (req, res) => {
   try {
     const classificationBreakdown = await Session.aggregate([
       {
@@ -310,7 +305,7 @@ app.get("/api/sessions/classification", async (req, res) => {
 });
 
 // 6. Total Number of Sessions
-app.get("/api/sessions/total", async (req, res) => {
+app.get("/get/api/sessions/total", async (req, res) => {
   try {
     const totalSessions = await Session.countDocuments();
     res.json({ totalSessions });
@@ -320,7 +315,7 @@ app.get("/api/sessions/total", async (req, res) => {
 });
 
 // 7. Average Polarity Score
-app.get("/api/sessions/average-polarity", async (req, res) => {
+app.get("/get/api/sessions/average-polarity", async (req, res) => {
   try {
     const avgPolarity = await Session.aggregate([
       {
