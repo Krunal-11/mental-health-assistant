@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useSession } from './context/SessionContext';
+
 import {
   AppBar,
   Toolbar,
@@ -31,6 +33,7 @@ const theme = createTheme({
 });
 
 const ConversationPage = () => {
+   const { sessionId } = useSession();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
    const navigate = useNavigate()
@@ -46,13 +49,19 @@ const ConversationPage = () => {
 
       try {
         // Send user message to the backend API
-        const response = await axios.post("http://localhost:5000/api/chat", {
-          message: input,
-        });
+         const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages, sessionId }), // Include sessionId in body
+      });
+
+      const data = await res.json();
 
         // Extract bot response from API response
         const botMessage: Message = {
-          text: response.data.reply, // Adjust based on actual response format
+          text: data, // Adjust based on actual response format
           sender: "bot",
         };
 
