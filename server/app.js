@@ -105,16 +105,19 @@ app.post("/api/sessions/:sessionId/chats", async (req, res, next) => {
     // Format the new entry for context
     const formattedContext = `\nUser: ${question}\nAI: ${answer}\n`;
 
-    // Find the user by session and retrieve the context
+    // Find the user and session document
     const user = await User.findOne({ "sessions._id": sessionId });
     if (!user) return res.status(404).json({ message: "Session not found" });
 
-    // Update the chat history and context
+    // Concatenate the new context to the existing context
+    const newContext = (user.context || "") + formattedContext;
+
+    // Update the chat history and context in two separate steps
     await User.updateOne(
       { "sessions._id": sessionId },
       {
         $push: { "sessions.$.chatHistory": chatMessage },
-        $set: { context: (user.context || "") + formattedContext },
+        $set: { context: newContext },
       }
     );
 
