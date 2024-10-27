@@ -1,6 +1,7 @@
 import React from "react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { SessionProvider } from "./context/SessionContext"; // Import the SessionProvider
 import "./App.css";
 import Login from "./Login";
 import Register from "./Register";
@@ -23,20 +24,24 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <Router>
-        <div className="App">
-          <Routes>
-            <Route path="/" element={<Homepage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/conversation" element={<Conversation />} />
-            <Route path="/stats" element={<Stats />} />
-          </Routes>
-        </div>
-      </Router>
-    </ThemeProvider>
+    <SessionProvider>
+      <ThemeProvider theme={theme}>
+        <Router>
+          <div className="App">
+            <Routes>
+              <Route path="/" element={<Homepage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/conversation" element={<Conversation />} />
+              <Route path="/stats" element={<Stats />} />
+            </Routes>
+          </div>
+        </Router>
+      </ThemeProvider>
+    </SessionProvider>
   );
 }
+
+
 
 export default App;

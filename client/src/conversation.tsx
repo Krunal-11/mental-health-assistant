@@ -1,5 +1,4 @@
-// src/ConversationPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -9,26 +8,14 @@ import {
   Box,
 } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 // Define message type
 type Message = {
   text: string;
   sender: "user" | "bot";
 };
-
-// Sample conversations
-const sampleConversations: Message[] = [
-  { text: "Hello! How can I improve my mental health?", sender: "user" },
-  {
-    text: "It's great that you're seeking help! Let's start with some basic techniques.",
-    sender: "bot",
-  },
-  { text: "What techniques do you recommend?", sender: "user" },
-  {
-    text: "Mindfulness and meditation can be very helpful. Would you like to try some exercises?",
-    sender: "bot",
-  },
-];
 
 // Create a dark theme
 const theme = createTheme({
@@ -46,31 +33,43 @@ const theme = createTheme({
 const ConversationPage = () => {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+   const navigate = useNavigate()
 
-  // Load sample conversations on component mount
-  useEffect(() => {
-    setMessages(sampleConversations);
-  }, []);
-
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (input.trim()) {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { text: input, sender: "user" },
-      ]);
+      // Add user's message to the messages array
+      const userMessage: Message = { text: input, sender: "user" };
+      setMessages((prevMessages) => [...prevMessages, userMessage]);
 
-      // Simulated bot response after 1 second
-      setTimeout(() => {
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            text: "I'm here to help! What would you like to discuss?",
-            sender: "bot",
-          },
-        ]);
-      }, 1000);
-
+      // Clear the input field
       setInput("");
+
+      try {
+        // Send user message to the backend API
+        const response = await axios.post("http://localhost:5000/api/chat", {
+          message: input,
+        });
+
+        // Extract bot response from API response
+        const botMessage: Message = {
+          text: response.data.reply, // Adjust based on actual response format
+          sender: "bot",
+        };
+
+        // Update messages with the bot's response
+        setMessages((prevMessages) => [...prevMessages, botMessage]);
+      } catch (error) {
+        console.error("Error fetching bot response:", error);
+      }
+    }
+  };
+
+  const handleEndConversation = async () => {
+    try {
+      await axios.post("http://localhost:5000/api/chat/end");
+      navigate("/stats"); // Navigate to /stats after successful request
+    } catch (error) {
+      console.error("Error ending conversation:", error);
     }
   };
 
@@ -142,11 +141,11 @@ const ConversationPage = () => {
             placeholder="Type your message..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress} // Listen for key presses
+            onKeyPress={handleKeyPress}
             sx={{
               marginRight: 1,
-              bgcolor: "#555", // Grayish background
-              borderRadius: "20px", // No border radius on bottom corners
+              bgcolor: "#555",
+              borderRadius: "20px",
               "& .MuiOutlinedInput-root": {
                 borderRadius: "20px 20px 0 0",
                 "& fieldset": {
@@ -158,6 +157,14 @@ const ConversationPage = () => {
               },
             }}
           />
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleEndConversation}
+            sx={{ borderRadius: "20px", marginRight: "10px" }}
+          >
+            End
+          </Button>
           <Button
             variant="contained"
             color="primary"
