@@ -5,22 +5,20 @@ app.use(express.json());
 
 // Connect to MongoDB
 mongoose
-  .connect("mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon")
+  .connect(
+    "mongodb+srv://megathon:megathon@cluster-megathon.ttspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-megathon"
+  )
   .then(() => console.log("Connected to MongoDB"))
   .catch((error) => console.error("MongoDB connection error:", error));
 
-// Define the Chat Schema
+// Define Schemas
 const ChatSchema = new mongoose.Schema({
   sessionId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: "Session",
   },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: "User",
-  },
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "User" },
   question: { type: String, required: true },
   answer: { type: String, required: true },
   polarity: { type: Number, required: true },
@@ -28,24 +26,18 @@ const ChatSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
-// Define the Session Schema
 const SessionSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: "User",
-  },
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "User" },
   sessionStart: { type: Date, default: Date.now },
   sessionEnd: { type: Date },
-  polarity: { type: Number, required: false },
-  keywords: { type: [String], required: false },
-  classified: { type: String, required: false },
-  severity: { type: Number, required: false },
-  improvement: { type: String, required: false },
+  polarity: { type: Number },
+  keywords: { type: [String] },
+  classified: { type: String },
+  severity: { type: Number },
+  improvement: { type: String },
   chatHistory: [ChatSchema],
 });
 
-// Define the User Schema
 const UserSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true },
   sessions: [SessionSchema],
@@ -57,84 +49,49 @@ const User = mongoose.model("User", UserSchema);
 const Session = mongoose.model("Session", SessionSchema);
 const Chat = mongoose.model("Chat", ChatSchema);
 
-/*
-  Start a New Session
-  POST /api/sessions/start
-  
-  Input:
-    - userId (String): ID of the user starting the session
-  
-  Output:
-    - sessionId (String): ID of the new session created
-*/
+// Middleware for error handling
+const errorHandler = (err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ message: "An error occurred", error: err.message });
+};
+
+// Helper function to find user
+const findUserById = async (userId) => {
+  return await User.findOne({ userId });
+};
+
+// Start a New Session
 app.post("/api/sessions/start", async (req, res) => {
   try {
     const { userId } = req.body;
     const newSession = { userId, sessionStart: new Date(), chatHistory: [] };
-    const user = await User.findOneAndUpdate(
-      { userId },
-      { $push: { sessions: newSession } },
-      { new: true, upsert: true }
-    );
+    const user = await findUserById(userId);
+
+    // If user doesn't exist, create a new one
+    if (!user) {
+      const newUser = new User({ userId, sessions: [newSession] });
+      await newUser.save();
+      const sessionId = newUser.sessions[0]._id;
+      return res.status(201).json({ sessionId });
+    }
+
+    // Update existing user with a new session
+    user.sessions.push(newSession);
+    await user.save();
     const sessionId = user.sessions[user.sessions.length - 1]._id;
+
     res.status(201).json({ sessionId });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 });
 
-/*
-  Add Chat Message to Session
-  POST /api/sessions/:sessionId/chats
-  
-  Input:
-    - sessionId (String, URL parameter): ID of the session to add chat to
-    - userId (String): ID of the user sending the chat
-    - question (String): Question asked by the user
-    - answer (String): Response given
-    - polarity (Number): Polarity score of the chat
-    - data (Object, optional): Additional metadata
-  
-  Output:
-    - message (String): Status message
-    - session (Object): Updated session data with added chat
-*/
-// app.post("/api/sessions/:sessionId/chats", async (req, res) => {
-//   try {
-//     const { sessionId } = req.params;
-//     const { userId, question, answer, polarity, data } = req.body;
-//     const chatMessage = {
-//       sessionId,
-//       userId,
-//       question,
-//       answer,
-//       polarity,
-//       data,
-//       timestamp: new Date(),
-//     };
-//     const user = await User.findOneAndUpdate(
-//       { "sessions._id": sessionId },
-//       { $push: { "sessions.$.chatHistory": chatMessage } },
-//       { new: true }
-//     );
-//     if (!user) return res.status(404).json({ message: "Session not found" });
-//     {
-//       console.log({ message: "Chat added", session: user.sessions.id(sessionId) })
-//       res
-//       .status(200)
-//       .json({ message: "Chat added", session: user.sessions.id(sessionId) });
-//     }
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
-
-app.post("/api/sessions/:sessionId/chats", async (req, res) => {
+// Add Chat Message to Session
+app.post("/api/sessions/:sessionId/chats", async (req, res, next) => {
   try {
     const { sessionId } = req.params;
     const { userId, question, answer, polarity, data } = req.body;
 
-    // Create the chat message object
     const chatMessage = {
       sessionId,
       userId,
@@ -148,51 +105,35 @@ app.post("/api/sessions/:sessionId/chats", async (req, res) => {
     // Format the new entry for context
     const formattedContext = `\nUser: ${question}\nAI: ${answer}\n`;
 
-    // Find the user and update the chat history and context
-    const user = await User.findOneAndUpdate(
+    // Find the user by session and retrieve the context
+    const user = await User.findOne({ "sessions._id": sessionId });
+    if (!user) return res.status(404).json({ message: "Session not found" });
+
+    // Update the chat history and context
+    await User.updateOne(
       { "sessions._id": sessionId },
       {
         $push: { "sessions.$.chatHistory": chatMessage },
-        $set: { context: { $concat: ["$context", formattedContext] } },
-      },
-      { new: true }
+        $set: { context: (user.context || "") + formattedContext },
+      }
     );
 
-    if (!user) return res.status(404).json({ message: "Session not found" });
+    // Retrieve the updated session to send back in the response
+    const updatedUser = await User.findOne({ "sessions._id": sessionId });
+    const updatedSession = updatedUser.sessions.id(sessionId);
 
-    console.log({
-      message: "Chat added",
-      session: user.sessions.id(sessionId),
-    });
-    res
-      .status(200)
-      .json({ message: "Chat added", session: user.sessions.id(sessionId) });
+    res.status(200).json({ message: "Chat added", session: updatedSession });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 });
 
-/*
-  End a Session with Summary Data
-  PUT /api/sessions/:sessionId/end
-  
-  Input:
-    - sessionId (String, URL parameter): ID of the session to end
-    - polarity (Number): Overall polarity score for the session
-    - keywords (Array of Strings): Keywords summarizing the session
-    - classified (String): Classification status of the session
-    - severity (Number): Severity level
-    - improvement (String): Improvement description
-  
-  Output:
-    - message (String): Status message
-    - session (Object): Updated session with summary data
-*/
-app.put("/api/sessions/:sessionId/end", async (req, res) => {
+// End a Session with Summary Data
+app.put("/api/sessions/:sessionId/end", async (req, res, next) => {
   try {
-    console.log("/api/sessions/:sessionId/end api called at line 149");
     const { sessionId } = req.params;
     const { polarity, keywords, classified, severity, improvement } = req.body;
+
     const sessionUpdate = {
       "sessions.$.sessionEnd": new Date(),
       "sessions.$.polarity": polarity,
@@ -201,52 +142,36 @@ app.put("/api/sessions/:sessionId/end", async (req, res) => {
       "sessions.$.severity": severity,
       "sessions.$.improvement": improvement,
     };
+
     const user = await User.findOneAndUpdate(
       { "sessions._id": sessionId },
       { $set: sessionUpdate },
       { new: true }
     );
+
     if (!user) return res.status(404).json({ message: "Session not found" });
     res
       .status(200)
       .json({ message: "Session ended", session: user.sessions.id(sessionId) });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 });
 
-/*
-  Retrieve All Sessions for a User
-  GET /api/users/:userId/sessions
-  
-  Input:
-    - userId (String, URL parameter): ID of the user
-  
-  Output:
-    - sessions (Array of Objects): List of all sessions for the user
-*/
-app.get("/api/users/:userId/sessions", async (req, res) => {
+// Retrieve All Sessions for a User
+app.get("/api/users/:userId/sessions", async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const user = await User.findOne({ userId });
+    const user = await findUserById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
     res.status(200).json({ sessions: user.sessions });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 });
 
-/*
-  Retrieve Specific Session Details
-  GET /api/sessions/:sessionId
-  
-  Input:
-    - sessionId (String, URL parameter): ID of the session to retrieve
-  
-  Output:
-    - session (Object): Details of the specified session
-*/
-app.get("/api/sessions/:sessionId", async (req, res) => {
+// Retrieve Specific Session Details
+app.get("/api/sessions/:sessionId", async (req, res, next) => {
   try {
     const { sessionId } = req.params;
     const user = await User.findOne({ "sessions._id": sessionId });
@@ -254,28 +179,27 @@ app.get("/api/sessions/:sessionId", async (req, res) => {
     const session = user.sessions.id(sessionId);
     res.status(200).json({ session });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 });
 
-///these are the aips for the ui
+// UI APIs
 
 // 1. User Session Overview (Recent Sessions)
-app.get("/get/api/sessions/recent", async (req, res) => {
+app.get("/get/api/sessions/recent", async (req, res, next) => {
   try {
-    console.log('api entered line 222')
     const recentSessions = await Session.find()
       .sort({ sessionStart: -1 })
       .limit(10)
       .populate("userId", "userId");
     res.json(recentSessions);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 // 2. Average Session Duration
-app.get("/get/api/sessions/average-duration", async (req, res) => {
+app.get("/get/api/sessions/average-duration", async (req, res, next) => {
   try {
     const avgSessionDuration = await Session.aggregate([
       { $match: { sessionEnd: { $exists: true } } },
@@ -293,12 +217,12 @@ app.get("/get/api/sessions/average-duration", async (req, res) => {
     ]);
     res.json(avgSessionDuration);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 // 3. Keyword Analysis
-app.get("/get/api/sessions/keywords", async (req, res) => {
+app.get("/get/api/sessions/keywords", async (req, res, next) => {
   try {
     const keywordAnalysis = await Session.aggregate([
       { $unwind: "$keywords" },
@@ -312,12 +236,12 @@ app.get("/get/api/sessions/keywords", async (req, res) => {
     ]);
     res.json(keywordAnalysis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 // 4. Chat History Insights
-app.get("/get/api/sessions/:sessionId/chat-history", async (req, res) => {
+app.get("/get/api/sessions/:sessionId/chat-history", async (req, res, next) => {
   const { sessionId } = req.params;
   try {
     const chatHistory = await Chat.find({ sessionId }).populate(
@@ -326,12 +250,12 @@ app.get("/get/api/sessions/:sessionId/chat-history", async (req, res) => {
     );
     res.json(chatHistory);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 // 5. Classification Breakdown
-app.get("/get/api/sessions/classification", async (req, res) => {
+app.get("/get/api/sessions/classification", async (req, res, next) => {
   try {
     const classificationBreakdown = await Session.aggregate([
       {
@@ -344,72 +268,25 @@ app.get("/get/api/sessions/classification", async (req, res) => {
     ]);
     res.json(classificationBreakdown);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 // 6. Total Number of Sessions
-app.get("/get/api/sessions/total", async (req, res) => {
+app.get("/get/api/sessions/total", async (req, res, next) => {
   try {
     const totalSessions = await Session.countDocuments();
     res.json({ totalSessions });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// 7. Average Polarity Score
-app.get("/get/api/sessions/average-polarity", async (req, res) => {
-  try {
-    const avgPolarity = await Session.aggregate([
-      {
-        $match: {
-          polarity: { $exists: true },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          avgPolarity: { $avg: "$polarity" },
-        },
-      },
-    ]);
-    res.json(avgPolarity);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Error handling middleware
+app.use(errorHandler);
+
+// Start Server
+const PORT = process.env.PORT || 3007;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
-
-//api to create a new user
-// Create new userd
-// Create new user
-app.post("/api/addusers", async (req, res) => {
-  console.log("Received request to add user:", req.body); // Log the incoming request
-  try {
-    const { userId } = req.body;
-    if (!userId) {
-      return res.status(400).json({ error: "User ID is required" });
-    }
-    // Check if the user already exists
-    const existingUser = await User.findOne({ userId });
-    if (existingUser) {
-      return res.status(409).json({ error: "User already exists" });
-    }
-    // Create and save the new user
-    const newUser = new User({ userId, sessions: [] });
-    await newUser.save();
-
-    res
-      .status(201)
-      .json({ message: "User created successfully", user: newUser });
-  } catch (error) {
-    console.error("Error creating user:", error); // Log the error
-    res
-      .status(500)
-      .json({ error: "An error occurred while creating the user" });
-  }
-});
-
-// Run the server
-const PORT = 3003;
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
