@@ -39,43 +39,49 @@ const ConversationPage = () => {
    const navigate = useNavigate()
 
   const handleSendMessage = async () => {
-    if (input.trim()) {
-      // Add user's message to the messages array
-      const userMessage: Message = { text: input, sender: "user" };
-      setMessages((prevMessages) => [...prevMessages, userMessage]);
-
-      // Clear the input field
-      setInput("");
-
-      try {
-        // Send user message to the backend API
-         const res = await fetch('/api/chat', {
+  console.log('send message button clicked');
+  if (input.trim()) {
+    const userMessage: Message = { text: input, sender: "user" };
+    setMessages((prevMessages) => [...prevMessages, userMessage]);
+    setInput("");
+    const sendMessage = userMessage.text;
+    console.log('messages are ', sendMessage);
+    console.log('session id is ',sessionId);
+    try {
+      console.log('send button api being called');
+      const res = await fetch('http://localhost:3003/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages, sessionId }), // Include sessionId in body
+        body: JSON.stringify({ sendMessage }),
       });
 
       const data = await res.json();
 
-        // Extract bot response from API response
-        const botMessage: Message = {
-          text: data, // Adjust based on actual response format
-          sender: "bot",
-        };
+      // Ensure 'data' has the expected format
+      const botMessage: Message = {
+        text: data.text || "An error occurred. Please try again later.",
+        sender: "bot",
+      };
 
-        // Update messages with the bot's response
-        setMessages((prevMessages) => [...prevMessages, botMessage]);
-      } catch (error) {
-        console.error("Error fetching bot response:", error);
-      }
+      setMessages((prevMessages) => [...prevMessages, botMessage]);
+    } catch (error) {
+      console.error("Error fetching bot response in send button API: ", error);
+      // Show a fallback error message in the chat
+      const errorMessage: Message = {
+        text: "Unable to fetch response. Please check your connection or try again later.",
+        sender: "bot",
+      };
+      setMessages((prevMessages) => [...prevMessages, errorMessage]);
     }
-  };
+  }
+};
+
 
   const handleEndConversation = async () => {
     try {
-      await axios.post("http://localhost:5000/api/chat/end");
+      await axios.post("http://localhost:3003/api/chat/end");
       navigate("/stats"); // Navigate to /stats after successful request
     } catch (error) {
       console.error("Error ending conversation:", error);

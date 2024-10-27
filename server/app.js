@@ -87,7 +87,9 @@ app.post("/api/sessions/start", async (req, res, next) => {
 
 // In your Express app file
 app.post("/api/chat", async (req, res) => {
+  console.log('/api/chat api called ');
   const { message } = req.body; // No sessionId from body
+  console.log('message in /api/chat is ',message);
 
   if (!message || !sessionId) {
     return res
@@ -96,7 +98,7 @@ app.post("/api/chat", async (req, res) => {
   }
 
   try {
-    const chatResponse = await fetch("http://127.0.0.1:8080/output", {
+    const chatResponse = await fetch("http://127.0.0.1:8081/output", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
