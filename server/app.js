@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors"); // CORS added for cross-origin requests
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Connect to MongoDB
@@ -61,13 +63,12 @@ const findUserById = async (userId) => {
 };
 
 // Start a New Session
-app.post("/api/sessions/start", async (req, res) => {
+app.post("/api/sessions/start", async (req, res, next) => {
   try {
     const { userId } = req.body;
     const newSession = { userId, sessionStart: new Date(), chatHistory: [] };
     const user = await findUserById(userId);
 
-    // If user doesn't exist, create a new one
     if (!user) {
       const newUser = new User({ userId, sessions: [newSession] });
       await newUser.save();
@@ -75,11 +76,9 @@ app.post("/api/sessions/start", async (req, res) => {
       return res.status(201).json({ sessionId });
     }
 
-    // Update existing user with a new session
     user.sessions.push(newSession);
     await user.save();
     const sessionId = user.sessions[user.sessions.length - 1]._id;
-
     res.status(201).json({ sessionId });
   } catch (err) {
     next(err);
@@ -102,17 +101,13 @@ app.post("/api/sessions/:sessionId/chats", async (req, res, next) => {
       timestamp: new Date(),
     };
 
-    // Format the new entry for context
     const formattedContext = `\nUser: ${question}\nAI: ${answer}\n`;
 
-    // Find the user and session document
     const user = await User.findOne({ "sessions._id": sessionId });
     if (!user) return res.status(404).json({ message: "Session not found" });
 
-    // Concatenate the new context to the existing context
     const newContext = (user.context || "") + formattedContext;
 
-    // Update the chat history and context in two separate steps
     await User.updateOne(
       { "sessions._id": sessionId },
       {
@@ -121,7 +116,6 @@ app.post("/api/sessions/:sessionId/chats", async (req, res, next) => {
       }
     );
 
-    // Retrieve the updated session to send back in the response
     const updatedUser = await User.findOne({ "sessions._id": sessionId });
     const updatedSession = updatedUser.sessions.id(sessionId);
 
@@ -187,8 +181,6 @@ app.get("/api/sessions/:sessionId", async (req, res, next) => {
 });
 
 // UI APIs
-
-// 1. User Session Overview (Recent Sessions)
 app.get("/get/api/sessions/recent", async (req, res, next) => {
   try {
     const recentSessions = await Session.find()
@@ -201,22 +193,14 @@ app.get("/get/api/sessions/recent", async (req, res, next) => {
   }
 });
 
-// 2. Average Session Duration
 app.get("/get/api/sessions/average-duration", async (req, res, next) => {
   try {
     const avgSessionDuration = await Session.aggregate([
       { $match: { sessionEnd: { $exists: true } } },
       {
-        $project: {
-          duration: { $subtract: ["$sessionEnd", "$sessionStart"] },
-        },
+        $project: { duration: { $subtract: ["$sessionEnd", "$sessionStart"] } },
       },
-      {
-        $group: {
-          _id: null,
-          avgDuration: { $avg: "$duration" },
-        },
-      },
+      { $group: { _id: null, avgDuration: { $avg: "$duration" } } },
     ]);
     res.json(avgSessionDuration);
   } catch (error) {
@@ -224,17 +208,11 @@ app.get("/get/api/sessions/average-duration", async (req, res, next) => {
   }
 });
 
-// 3. Keyword Analysis
 app.get("/get/api/sessions/keywords", async (req, res, next) => {
   try {
     const keywordAnalysis = await Session.aggregate([
       { $unwind: "$keywords" },
-      {
-        $group: {
-          _id: "$keywords",
-          count: { $sum: 1 },
-        },
-      },
+      { $group: { _id: "$keywords", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
     res.json(keywordAnalysis);
@@ -243,7 +221,6 @@ app.get("/get/api/sessions/keywords", async (req, res, next) => {
   }
 });
 
-// 4. Chat History Insights
 app.get("/get/api/sessions/:sessionId/chat-history", async (req, res, next) => {
   const { sessionId } = req.params;
   try {
@@ -257,16 +234,10 @@ app.get("/get/api/sessions/:sessionId/chat-history", async (req, res, next) => {
   }
 });
 
-// 5. Classification Breakdown
 app.get("/get/api/sessions/classification", async (req, res, next) => {
   try {
     const classificationBreakdown = await Session.aggregate([
-      {
-        $group: {
-          _id: "$classified",
-          count: { $sum: 1 },
-        },
-      },
+      { $group: { _id: "$classified", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
     res.json(classificationBreakdown);
@@ -275,7 +246,6 @@ app.get("/get/api/sessions/classification", async (req, res, next) => {
   }
 });
 
-// 6. Total Number of Sessions
 app.get("/get/api/sessions/total", async (req, res, next) => {
   try {
     const totalSessions = await Session.countDocuments();
