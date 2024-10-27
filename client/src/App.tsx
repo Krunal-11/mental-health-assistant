@@ -1,10 +1,11 @@
 import React from "react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import "./App.css";
 import Login from "./Login";
 import Register from "./Register";
 import Homepage from "./Homepage";
-import Conversation from "./conversation";
+import Conversation from "./Conversation";
 import Stats from "./Stats";
 
 // Create a custom dark theme
@@ -21,18 +22,19 @@ const theme = createTheme({
 });
 
 function App() {
-  const data = "krish";
-
   return (
     <ThemeProvider theme={theme}>
-      <div className="App">
-        {/* Uncomment the component you want to render */}
-        {/* <Login /> */}
-        {/* <Register /> */}
-        {/* <Homepage /> */}
-        {/* <Conversation /> */}
-        <Stats />
-      </div>
+      <Router>
+        <div className="App">
+          <Routes>
+            <Route path="/" element={<Homepage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/conversation" element={<Conversation />} />
+            <Route path="/stats" element={<Stats />} />
+          </Routes>
+        </div>
+      </Router>
     </ThemeProvider>
   );
 }

@@ -101,7 +101,8 @@ app.post("/api/sessions/:sessionId/chats", async (req, res, next) => {
       timestamp: new Date(),
     };
 
-    const formattedContext = `\nUser: ${question}\nAI: ${answer}\n`;
+    const formattedContext = "\n"+`User: ${question}\nAI: ${answer}`+
+    "\n";
 
     const user = await User.findOne({ "sessions._id": sessionId });
     if (!user) return res.status(404).json({ message: "Session not found" });
@@ -259,7 +260,7 @@ app.get("/get/api/sessions/total", async (req, res, next) => {
 app.use(errorHandler);
 
 // Start Server
-const PORT = process.env.PORT || 3007;
+const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

@@ -1,5 +1,6 @@
 // src/HomePage.js
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AppBar,
   Button,
@@ -29,6 +30,7 @@ const theme = createTheme({
 });
 
 const HomePage = () => {
+  const navigate = useNavigate();
   return (
     <ThemeProvider theme={theme}>
       <AppBar
@@ -95,7 +97,7 @@ const HomePage = () => {
                   padding: "12px 24px",
                 }} // Use your desired blue color
                 size="large"
-                onClick={() => alert("Start New Session")}
+                onClick={() => navigate("/conversation")}
               >
                 Start New Session
               </Button>
@@ -105,7 +107,7 @@ const HomePage = () => {
                 color="secondary"
                 size="large"
                 style={{ padding: "12px 24px" }}
-                onClick={() => alert("Check Stats")}
+                onClick={() => navigate("/stats")}
               >
                 Check Stats
               </Button>
