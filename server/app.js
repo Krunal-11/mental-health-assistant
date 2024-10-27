@@ -85,6 +85,63 @@ app.post("/api/sessions/start", async (req, res, next) => {
   }
 });
 
+// In your Express app file
+app.post("/api/chat", async (req, res) => {
+  const { message } = req.body; // No sessionId from body
+
+  if (!message || !sessionId) {
+    return res
+      .status(400)
+      .json({ error: "Message and sessionId are required" });
+  }
+
+  try {
+    const chatResponse = await fetch("http://127.0.0.1:8080/output", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!chatResponse.ok) {
+      throw new Error("Failed to fetch response from chat API");
+    }
+
+    const chatData = await chatResponse.json();
+    const { response } = chatData;
+
+    const chatLogData = {
+      userId: "671dac335809f9a6aea0d4dd",
+      question: message,
+      answer: response,
+      polarity: 0,
+    };
+
+    const logResponse = await fetch(
+      `http://127.0.0.1:3000/api/sessions/${sessionId}/chats`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(chatLogData),
+      }
+    );
+
+    if (!logResponse.ok) {
+      throw new Error("Failed to save chat log");
+    }
+
+    const result = await logResponse.json();
+
+    return res.json({ response }); // Use res.json to send response
+  } catch (error) {
+    console.error("Error handling chat request:", error);
+    return res.status(500).json({ error: "An error occurred" }); // Send error response
+  }
+});
+
 // Add Chat Message to Session
 app.post("/api/sessions/:sessionId/chats", async (req, res, next) => {
   try {
